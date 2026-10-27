@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -16,10 +17,71 @@ func (s *stringSlice) Set(v string) error {
 	return nil
 }
 
+var (
+	stdinData  []byte
+	stdinErr   error
+	stdinRead  bool
+)
+
+func readStdinOnce() ([]byte, error) {
+	if stdinRead {
+		return stdinData, stdinErr
+	}
+	stdinRead = true
+	stdinData, stdinErr = io.ReadAll(os.Stdin)
+	return stdinData, stdinErr
+}
+
+func resetStdinCache() {
+	stdinData = nil
+	stdinErr = nil
+	stdinRead = false
+}
+
+func parseJSON(data []byte) (interface{}, error) {
+	if bytes.HasPrefix(data, []byte{0xEF, 0xBB, 0xBF}) {
+		data = data[3:]
+	}
+	if len(bytes.TrimSpace(data)) == 0 {
+		return nil, fmt.Errorf("empty JSON input")
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+	var v interface{}
+	if err := dec.Decode(&v); err != nil {
+		return nil, err
+	}
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return nil, fmt.Errorf("trailing data after top-level JSON value")
+		}
+		return nil, err
+	}
+	return v, nil
+}
+
+func readJSON(path string) (interface{}, error) {
+	var data []byte
+	var err error
+	if path == "-" {
+		data, err = readStdinOnce()
+	} else {
+		data, err = os.ReadFile(path)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return parseJSON(data)
+}
+
 func main() {
 	var ignore stringSlice
 	var quiet bool
+	var output string
 	colorFlag := flag.String("color", "auto", "color output: auto, always, never")
+	flag.StringVar(&output, "output", "text", "output format: text or json")
+	flag.StringVar(&output, "o", "text", "alias for --output")
+	flag.StringVar(&output, "format", "text", "alias for --output")
 	flag.BoolVar(&quiet, "q", false, "quiet (print nothing, only exit status)")
 	flag.BoolVar(&quiet, "quiet", false, "alias for -q")
 	flag.Var(&ignore, "ignore", "key to ignore (repeatable)")
@@ -37,18 +99,12 @@ func main() {
 		os.Exit(2)
 	}
 
-	a, err := readJSON(args[0])
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error reading %s: %v\n", args[0], err)
+	switch output {
+	case "text", "json":
+	default:
+		fmt.Fprintf(os.Stderr, "invalid --output value: %s\n", output)
 		os.Exit(2)
 	}
-	b, err := readJSON(args[1])
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error reading %s: %v\n", args[1], err)
-		os.Exit(2)
-	}
-
-	changes := Diff(a, b, ignore)
 
 	useColor := false
 	switch *colorFlag {
@@ -65,33 +121,41 @@ func main() {
 		os.Exit(2)
 	}
 
+	a, err := readJSON(args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error reading %s: %v\n", args[0], err)
+		os.Exit(2)
+	}
+	b, err := readJSON(args[1])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error reading %s: %v\n", args[1], err)
+		os.Exit(2)
+	}
+
+	changes := Diff(a, b, ignore)
+
 	if !quiet {
-		for _, c := range changes {
-			fmt.Println(formatChange(c, useColor))
+		switch output {
+		case "json":
+			out := changes
+			if out == nil {
+				out = []Change{}
+			}
+			encoded, err := json.Marshal(out)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error encoding output: %v\n", err)
+				os.Exit(2)
+			}
+			fmt.Println(string(encoded))
+		default:
+			for _, c := range changes {
+				fmt.Println(formatChange(c, useColor))
+			}
 		}
 	}
 	if len(changes) > 0 {
 		os.Exit(1)
 	}
-}
-
-func readJSON(path string) (interface{}, error) {
-	var data []byte
-	var err error
-	if path == "-" {
-		data, err = io.ReadAll(os.Stdin)
-	} else {
-		data, err = os.ReadFile(path)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	var v interface{}
-	if err := json.Unmarshal(data, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
 }
 
 func formatChange(c Change, color bool) string {

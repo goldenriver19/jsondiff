@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -21,6 +22,23 @@ type Change struct {
 	Kind ChangeKind
 	Old  interface{}
 	New  interface{}
+}
+
+// MarshalJSON renders a Change in a machine-readable form. Absent values are
+// omitted according to the change kind, including zero values such as 0,
+// false, or the empty string.
+func (c Change) MarshalJSON() ([]byte, error) {
+	obj := map[string]interface{}{
+		"path": c.Path,
+		"kind": c.Kind,
+	}
+	if c.Kind != KindAdd {
+		obj["old"] = c.Old
+	}
+	if c.Kind != KindRemove {
+		obj["new"] = c.New
+	}
+	return json.Marshal(obj)
 }
 
 // Diff compares two decoded JSON values and returns all differences.
