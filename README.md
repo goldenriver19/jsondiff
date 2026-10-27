@@ -22,7 +22,7 @@ Use `-` as one of the file arguments to read that document from standard input.
 Options:
 
 - `-i` / `--ignore KEY` ignore a key everywhere (repeatable)
-- `-q` quiet mode (no output, only exit status)
+- `-q` / `--quiet` quiet mode (no output, only exit status)
 - `--color auto|always|never` control colored output (default: auto)
 
 ## Exit codes

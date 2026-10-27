@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -17,10 +18,12 @@ func (s *stringSlice) Set(v string) error {
 
 func main() {
 	var ignore stringSlice
+	var quiet bool
 	colorFlag := flag.String("color", "auto", "color output: auto, always, never")
-	quiet := flag.Bool("q", false, "quiet (print nothing, only exit status)")
+	flag.BoolVar(&quiet, "q", false, "quiet (print nothing, only exit status)")
+	flag.BoolVar(&quiet, "quiet", false, "alias for -q")
 	flag.Var(&ignore, "ignore", "key to ignore (repeatable)")
-	flag.Var(&ignore, "i", "alias for -ignore")
+	flag.Var(&ignore, "i", "alias for --ignore")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] <file1> <file2>\n", os.Args[0])
 		fmt.Fprintln(os.Stderr, "Compare two JSON documents and report structural differences.")
@@ -62,7 +65,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	if !*quiet {
+	if !quiet {
 		for _, c := range changes {
 			fmt.Println(formatChange(c, useColor))
 		}
@@ -73,20 +76,19 @@ func main() {
 }
 
 func readJSON(path string) (interface{}, error) {
-	var f *os.File
+	var data []byte
 	var err error
 	if path == "-" {
-		f = os.Stdin
+		data, err = io.ReadAll(os.Stdin)
 	} else {
-		f, err = os.Open(path)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
+		data, err = os.ReadFile(path)
 	}
-	dec := json.NewDecoder(f)
+	if err != nil {
+		return nil, err
+	}
+
 	var v interface{}
-	if err := dec.Decode(&v); err != nil {
+	if err := json.Unmarshal(data, &v); err != nil {
 		return nil, err
 	}
 	return v, nil
