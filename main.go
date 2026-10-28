@@ -113,8 +113,10 @@ func main() {
 	case "never":
 		useColor = false
 	case "auto":
-		if fi, err := os.Stdout.Stat(); err == nil && fi.Mode()&os.ModeCharDevice != 0 {
-			useColor = true
+		if _, ok := os.LookupEnv("NO_COLOR"); !ok {
+			if fi, err := os.Stdout.Stat(); err == nil && fi.Mode()&os.ModeCharDevice != 0 {
+				useColor = true
+			}
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "invalid --color value: %s\n", *colorFlag)
