@@ -51,7 +51,8 @@ func parseJSON(data []byte) (interface{}, error) {
 	if err := dec.Decode(&v); err != nil {
 		return nil, err
 	}
-	if err := dec.Decode(&struct{}{}); err != io.EOF {
+	var extra json.RawMessage
+	if err := dec.Decode(&extra); err != io.EOF {
 		if err == nil {
 			return nil, fmt.Errorf("trailing data after top-level JSON value")
 		}
