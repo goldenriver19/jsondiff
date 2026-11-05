@@ -77,6 +77,7 @@ func readJSON(path string) (interface{}, error) {
 
 func main() {
 	var ignore stringSlice
+	var ignorePaths stringSlice
 	var quiet bool
 	var output string
 	colorFlag := flag.String("color", "auto", "color output: auto, always, never")
@@ -88,6 +89,8 @@ func main() {
 	flag.BoolVar(&quiet, "quiet", false, "alias for -q")
 	flag.Var(&ignore, "ignore", "key to ignore (repeatable)")
 	flag.Var(&ignore, "i", "alias for --ignore")
+	flag.Var(&ignorePaths, "ignore-path", "JSON path to ignore (repeatable)")
+	flag.Var(&ignorePaths, "I", "alias for --ignore-path")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] <file1> <file2>\n", os.Args[0])
 		fmt.Fprintln(os.Stderr, "Compare two JSON documents and report structural differences.")
@@ -139,7 +142,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	changes := Diff(a, b, ignore)
+	changes := DiffWithIgnores(a, b, ignore, ignorePaths)
 
 	if !quiet {
 		switch output {

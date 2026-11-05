@@ -63,6 +63,28 @@ func TestIgnore(t *testing.T) {
 	}
 }
 
+func TestIgnorePath(t *testing.T) {
+	a := map[string]interface{}{"secret": "old", "x": 1.0, "user": map[string]interface{}{"password": "old"}}
+	b := map[string]interface{}{"secret": "new", "x": 2.0, "user": map[string]interface{}{"password": "new", "city": "NYC"}}
+	ch := DiffWithIgnores(a, b, nil, []string{"$.secret"})
+	paths := []string{}
+	for _, c := range ch {
+		paths = append(paths, c.Path)
+	}
+	if !reflect.DeepEqual(paths, []string{"$.user.city", "$.user.password", "$.x"}) {
+		t.Fatalf("%v", paths)
+	}
+}
+
+func TestIgnorePathIncluded(t *testing.T) {
+	a := map[string]interface{}{"value": 1.0}
+	b := map[string]interface{}{"value": 2.0, "extra": 3.0}
+	ch := DiffWithIgnores(a, b, nil, []string{"$.extra"})
+	if len(ch) != 1 || ch[0].Path != "$.value" {
+		t.Fatalf("%+v", ch)
+	}
+}
+
 func TestRootScalar(t *testing.T) {
 	ch := Diff(1.0, 2.0, nil)
 	if len(ch) != 1 || ch[0].Path != "$" {

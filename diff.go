@@ -44,16 +44,31 @@ func (c Change) MarshalJSON() ([]byte, error) {
 // Diff compares two decoded JSON values and returns all differences.
 // Keys listed in ignore are skipped entirely (including their subtrees).
 func Diff(a, b interface{}, ignore []string) []Change {
-	ign := make(map[string]bool, len(ignore))
-	for _, k := range ignore {
-		ign[k] = true
+	return DiffWithIgnores(a, b, ignore, nil)
+}
+
+// DiffWithIgnores compares two decoded JSON values and returns all
+// differences. Keys listed in ignoreKeys are skipped everywhere, while paths
+// listed in ignorePaths are skipped only at those exact JSON paths.
+func DiffWithIgnores(a, b interface{}, ignoreKeys, ignorePaths []string) []Change {
+	errIgnoredKeys := make(map[string]bool, len(ignoreKeys))
+	for _, k := range ignoreKeys {
+		errIgnoredKeys[k] = true
+	}
+	ignoredPaths := make(map[string]bool, len(ignorePaths))
+	for _, p := range ignorePaths {
+		ignoredPaths[p] = true
 	}
 	var changes []Change
-	diffValue("$", a, b, ign, &changes)
+	diffValue("$", a, b, errIgnoredKeys, ignoredPaths, &changes)
 	return changes
 }
 
-func diffValue(path string, a, b interface{}, ignore map[string]bool, changes *[]Change) {
+func diffValue(path string, a, b interface{}, ignoreKeys, ignorePaths map[string]bool, changes *[]Change) {
+	if ignorePaths[path] {
+		return
+	}
+
 	// Both objects: compare union of keys.
 	ma, oka := a.(map[string]interface{})
 	mb, okb := b.(map[string]interface{})
@@ -71,18 +86,21 @@ func diffValue(path string, a, b interface{}, ignore map[string]bool, changes *[
 		}
 		sort.Strings(sorted)
 		for _, k := range sorted {
-			if ignore[k] {
+			if ignoreKeys[k] {
 				continue
 			}
 			va, ina := ma[k]
 			vb, inb := mb[k]
 			child := path + "." + k
+			if ignorePaths[child] {
+				continue
+			}
 			if !ina {
 				*changes = append(*changes, Change{Path: child, Kind: KindAdd, New: vb})
 			} else if !inb {
 				*changes = append(*changes, Change{Path: child, Kind: KindRemove, Old: va})
 			} else {
-				diffValue(child, va, vb, ignore, changes)
+				diffValue(child, va, vb, ignoreKeys, ignorePaths, changes)
 			}
 		}
 		return
@@ -98,12 +116,15 @@ func diffValue(path string, a, b interface{}, ignore map[string]bool, changes *[
 		}
 		for i := 0; i < n; i++ {
 			child := fmt.Sprintf("%s[%d]", path, i)
+			if ignorePaths[child] {
+				continue
+			}
 			if i >= len(la) {
 				*changes = append(*changes, Change{Path: child, Kind: KindAdd, New: lb[i]})
 			} else if i >= len(lb) {
 				*changes = append(*changes, Change{Path: child, Kind: KindRemove, Old: la[i]})
 			} else {
-				diffValue(child, la[i], lb[i], ignore, changes)
+				diffValue(child, la[i], lb[i], ignoreKeys, ignorePaths, changes)
 			}
 		}
 		return

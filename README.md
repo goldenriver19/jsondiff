@@ -24,6 +24,7 @@ documents.
 Options:
 
 - `-i` / `--ignore KEY` ignore a key everywhere (repeatable)
+- `-I` / `--ignore-path PATH` ignore an exact JSON path (repeatable)
 - `-q` / `--quiet` quiet mode (no output, only exit status)
 - `-o` / `--output text|json` / `--format text|json` output format (default: text)
 - `--color auto|always|never` control colored output (default: auto)
