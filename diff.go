@@ -51,6 +51,12 @@ func Diff(a, b interface{}, ignore []string) []Change {
 // differences. Keys listed in ignoreKeys are skipped everywhere, while paths
 // listed in ignorePaths are skipped only at those exact JSON paths.
 func DiffWithIgnores(a, b interface{}, ignoreKeys, ignorePaths []string) []Change {
+	return DiffWithOptions(a, b, ignoreKeys, ignorePaths, -1)
+}
+
+// DiffWithOptions compares two decoded JSON values with optional max depth.
+// A maxDepth of -1 disables depth limiting.
+func DiffWithOptions(a, b interface{}, ignoreKeys, ignorePaths []string, maxDepth int) []Change {
 	errIgnoredKeys := make(map[string]bool, len(ignoreKeys))
 	for _, k := range ignoreKeys {
 		errIgnoredKeys[k] = true
@@ -60,12 +66,26 @@ func DiffWithIgnores(a, b interface{}, ignoreKeys, ignorePaths []string) []Chang
 		ignoredPaths[p] = true
 	}
 	var changes []Change
-	diffValue("$", a, b, errIgnoredKeys, ignoredPaths, &changes)
+	diffValue("$", a, b, errIgnoredKeys, ignoredPaths, &changes, 0, maxDepth)
 	return changes
 }
 
-func diffValue(path string, a, b interface{}, ignoreKeys, ignorePaths map[string]bool, changes *[]Change) {
+func withinDepth(depth, maxDepth int) bool {
+	if maxDepth < 0 {
+		return true
+	}
+	return depth < maxDepth
+}
+
+func diffValue(path string, a, b interface{}, ignoreKeys, ignorePaths map[string]bool, changes *[]Change, depth, maxDepth int) {
 	if ignorePaths[path] {
+		return
+	}
+
+	if !withinDepth(depth, maxDepth) {
+		if !reflect.DeepEqual(a, b) {
+			*changes = append(*changes, Change{Path: path, Kind: KindChange, Old: a, New: b})
+		}
 		return
 	}
 
@@ -100,7 +120,7 @@ func diffValue(path string, a, b interface{}, ignoreKeys, ignorePaths map[string
 			} else if !inb {
 				*changes = append(*changes, Change{Path: child, Kind: KindRemove, Old: va})
 			} else {
-				diffValue(child, va, vb, ignoreKeys, ignorePaths, changes)
+				diffValue(child, va, vb, ignoreKeys, ignorePaths, changes, depth+1, maxDepth)
 			}
 		}
 		return
@@ -124,7 +144,7 @@ func diffValue(path string, a, b interface{}, ignoreKeys, ignorePaths map[string
 			} else if i >= len(lb) {
 				*changes = append(*changes, Change{Path: child, Kind: KindRemove, Old: la[i]})
 			} else {
-				diffValue(child, la[i], lb[i], ignoreKeys, ignorePaths, changes)
+				diffValue(child, la[i], lb[i], ignoreKeys, ignorePaths, changes, depth+1, maxDepth)
 			}
 		}
 		return

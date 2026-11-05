@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 )
 
 type stringSlice []string
@@ -80,6 +81,7 @@ func main() {
 	var ignorePaths stringSlice
 	var quiet bool
 	var output string
+	var maxDepth int
 	colorFlag := flag.String("color", "auto", "color output: auto, always, never")
 	noColor := flag.Bool("no-color", false, "disable colored output")
 	flag.StringVar(&output, "output", "text", "output format: text or json")
@@ -91,6 +93,7 @@ func main() {
 	flag.Var(&ignore, "i", "alias for --ignore")
 	flag.Var(&ignorePaths, "ignore-path", "JSON path to ignore (repeatable)")
 	flag.Var(&ignorePaths, "I", "alias for --ignore-path")
+	flag.IntVar(&maxDepth, "max-depth", -1, "limit diff depth (-1 disables)")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] <file1> <file2>\n", os.Args[0])
 		fmt.Fprintln(os.Stderr, "Compare two JSON documents and report structural differences.")
@@ -111,6 +114,12 @@ func main() {
 		os.Exit(2)
 	}
 
+	if maxDepthStr := os.Getenv("JSONDIFF_MAX_DEPTH"); maxDepthStr != "" {
+		if v, err := strconv.Atoi(maxDepthStr); err == nil {
+			maxDepth = v
+		}
+	}
+
 	useColor := false
 	switch *colorFlag {
 	case "always":
@@ -119,6 +128,9 @@ func main() {
 		useColor = false
 	case "auto":
 		if _, ok := os.LookupEnv("NO_COLOR"); !ok {
+			if fi, err := os.Stat("/dev/stdout"); err == nil && fi.Mode()&os.ModeCharDevice != 0 {
+				_ = fi
+			}
 			if fi, err := os.Stdout.Stat(); err == nil && fi.Mode()&os.ModeCharDevice != 0 {
 				useColor = true
 			}
@@ -142,7 +154,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	changes := DiffWithIgnores(a, b, ignore, ignorePaths)
+	changes := DiffWithOptions(a, b, ignore, ignorePaths, maxDepth)
 
 	if !quiet {
 		switch output {
