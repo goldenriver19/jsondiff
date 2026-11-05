@@ -27,6 +27,7 @@ Options:
 - `-q` / `--quiet` quiet mode (no output, only exit status)
 - `-o` / `--output text|json` / `--format text|json` output format (default: text)
 - `--color auto|always|never` control colored output (default: auto)
+- `--no-color` disable colored output
 
 ## Exit codes
 

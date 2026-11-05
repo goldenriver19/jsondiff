@@ -80,6 +80,7 @@ func main() {
 	var quiet bool
 	var output string
 	colorFlag := flag.String("color", "auto", "color output: auto, always, never")
+	noColor := flag.Bool("no-color", false, "disable colored output")
 	flag.StringVar(&output, "output", "text", "output format: text or json")
 	flag.StringVar(&output, "o", "text", "alias for --output")
 	flag.StringVar(&output, "format", "text", "alias for --output")
@@ -122,6 +123,9 @@ func main() {
 	default:
 		fmt.Fprintf(os.Stderr, "invalid --color value: %s\n", *colorFlag)
 		os.Exit(2)
+	}
+	if *noColor {
+		useColor = false
 	}
 
 	a, err := readJSON(args[0])
