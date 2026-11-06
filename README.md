@@ -29,6 +29,12 @@ Options:
 - `-o` / `--output text|json` / `--format text|json` output format (default: text)
 - `--color auto|always|never` control colored output (default: auto)
 - `--no-color` disable colored output
+- `--max-depth N` limit diff traversal depth (`-1` disables, default: -1)
+
+Environment variables:
+
+- `NO_COLOR` disables colored output in `auto` mode when set
+- `JSONDIFF_MAX_DEPTH` overrides `--max-depth` when set
 
 ## Exit codes
 

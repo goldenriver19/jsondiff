@@ -128,9 +128,6 @@ func main() {
 		useColor = false
 	case "auto":
 		if _, ok := os.LookupEnv("NO_COLOR"); !ok {
-			if fi, err := os.Stat("/dev/stdout"); err == nil && fi.Mode()&os.ModeCharDevice != 0 {
-				_ = fi
-			}
 			if fi, err := os.Stdout.Stat(); err == nil && fi.Mode()&os.ModeCharDevice != 0 {
 				useColor = true
 			}
